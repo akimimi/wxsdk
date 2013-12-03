@@ -2,7 +2,9 @@
 
 require_once ROOT."/lib/event_click_handler.php";
 require_once ROOT."/lib/event_subscribe_handler.php";
+require_once ROOT."/lib/event_scan_handler.php";
 require_once ROOT."/lib/msg_handler.php";
+require_once ROOT."/lib/wx_sdk_error.php";
 
 class WxSdk {
 
@@ -74,8 +76,7 @@ class WxSdk {
    */
   var $wxPushData = null;
 
-  const ERRCODE_NO_TEXT_FOR_MSG = -10001;
-  const ERRMSG_NO_TEXT_FOR_MSG = "no text for sending message";
+  var $handlers = null;
 
   /**
    * Default construct function of WxSdk
@@ -85,6 +86,19 @@ class WxSdk {
   public function __construct($appid, $appsecret) {
     $this->appid = $appid;
     $this->appsecret = $appsecret;
+    $this->handlers = array();
+    $this->handlers['subscribe'] = new EventSubscribeHandler(null, $this);
+    $this->handlers['click'] = new EventClickHandler(null, $this);
+    $this->handlers['scan'] = new EventScanHandler(null, $this);
+  }
+
+  /**
+   * Set handler object to replace the default event handler.
+   * @param string $handlerType Handler type string.
+   * @param WxPushHandler $handler Handler object.
+   */
+  public function setHandler($handlerType, $handler) {
+    $this->handlers[$handlerType] = $handler;
   }
 
   /**
@@ -155,7 +169,13 @@ class WxSdk {
     $query = "access_token=".$this->accessToken;
 
     if ($type == "text") {
-      return $this->pushTextMessage($url, $query, $openid, $data);
+      return $this->pushText($url, $query, $openid, $data);
+    }
+    elseif ($type == "image") {
+      return $this->pushImage($url, $query, $openid, $data);
+    }
+    elseif ($type == "voice") {
+      return $this->pushVoice($url, $query, $openid, $data);
     }
     elseif ($type == "news") {
       return $this->pushNews($url, $query, $openid, $data);
@@ -170,10 +190,10 @@ class WxSdk {
    * @param array $data Text data, including $data['text']
    * @return boolean
    */
-  private function pushTextMessage($url, $query, $openid, $data) {
+  private function pushText($url, $query, $openid, $data) {
     if (empty($data) || empty($data['text'])) {
-      $errorCode = ERRCODE_NO_TEXT_FOR_MSG;
-      $errorMsg = ERRMSG_NO_TEXT_FOR_MSG;
+      $errorCode = WxSdkError::ERRCODE_NO_TEXT_FOR_MSG;
+      $errorMsg = WxSdkError::ERRMSG_NO_TEXT_FOR_MSG;
       return false;
     }
     $post = array(
@@ -182,6 +202,64 @@ class WxSdk {
       'text' => array('content' => $data['text'])
     );
     $postString = ch_json_encode($post);
+    $rt = $this->request($url, $query, true, $postString);
+    if ($rt['errcode'] == 0)
+      return true;
+    else {
+      $this->parseError($rt);
+      return false;
+    }
+  }
+
+  /**
+   * Push image to user.
+   * @param string $url The URL address of Wechat API.
+   * @param string $query Query string of API request.
+   * @param string $openid Openid of the user to push.
+   * @param array $data image resource data, including $data['image_media_id']
+   * @return boolean
+   */
+  private function pushImage($url, $query, $openid, $data) {
+    if (empty($data) || empty($data['image_media_id'])) {
+      $errorCode = WxSdkError::ERRCODE_NO_IMAGE_FOR_MSG;
+      $errorMsg = WxSdkError::ERRMSG_NO_IMAGE_FOR_MSG;
+      return false;
+    }
+    $post = array(
+      'touser' => $openid,
+      'msgtype' => 'image',
+      'image' => array('media_id' => $data['image_media_id'])
+    );
+    $postString = json_encode($post);
+    $rt = $this->request($url, $query, true, $postString);
+    if ($rt['errcode'] == 0)
+      return true;
+    else {
+      $this->parseError($rt);
+      return false;
+    }
+  }
+
+  /**
+   * Push voice to user.
+   * @param string $url The URL address of Wechat API.
+   * @param string $query Query string of API request.
+   * @param string $openid Openid of the user to push.
+   * @param array $data voice resource data, including $data['voice_media_id']
+   * @return boolean
+   */
+  private function pushVoice($url, $query, $openid, $data) {
+    if (empty($data) || empty($data['voice_media_id'])) {
+      $errorCode = WxSdkError::ERRCODE_NO_VOICE_FOR_MSGp;
+      $errorMsg = WxSdkError::ERRMSG_NO_VOICE_FOR_MSG;
+      return false;
+    }
+    $post = array(
+      'touser' => $openid,
+      'msgtype' => 'voice',
+      'image' => array('media_id' => $data['voice_media_id'])
+    );
+    $postString = json_encode($post);
     $rt = $this->request($url, $query, true, $postString);
     if ($rt['errcode'] == 0)
       return true;
@@ -201,8 +279,8 @@ class WxSdk {
    */
   private function pushNews($url, $query, $openid, $data) {
     if (empty($data) || empty($data['articles'])) {
-      $errorCode = ERRCODE_NO_TEXT_FOR_MSG;
-      $errorMsg = ERRMSG_NO_TEXT_FOR_MSG;
+      $errorCode = WxSdkError::ERRCODE_NO_TEXT_FOR_MSG;
+      $errorMsg = WxSdkError::ERRMSG_NO_TEXT_FOR_MSG;
       return false;
     }
     $post = array(
@@ -211,7 +289,6 @@ class WxSdk {
       'news' => array('articles' => $data['articles'])
     );
     $postString = ch_json_encode($post);
-    echo $postString.PHP_EOL;
     $rt = $this->request($url, $query, true, $postString);
     if ($rt['errcode'] == 0)
       return true;
@@ -219,6 +296,45 @@ class WxSdk {
       $this->parseError($rt);
       return false;
     }
+  }
+
+  /**
+   * Upload resource file, with supported types of image, voice, video and thumb.
+   * @param string $mediaType Media type string.
+   * @param string $filename Filename of upload file.
+   * @return string The media ID string is returned, the resource file is uploaded successfully.
+   * Return FALSE, if upload is failed.
+   */
+  public function uploadResource($mediaType, $filename) {
+    if (!$this->refreshAccessToken()) {
+      throw new Exception();
+    }
+
+    $url = "http://file.api.weixin.qq.com/cgi-bin/media/upload";
+    $query = "access_token=".$this->accessToken."&type=$mediaType";
+    $postString = array('media' => "@$filename");
+    $rt = $this->request($url, $query, true, $postString, false);
+    if (!empty($rt) && !empty($rt['media_id'])) {
+      return $rt['media_id'];
+    }
+    else {
+      $this->parseError($rt);
+      return FALSE;
+    }
+  }
+
+  /**
+   * Get the resource download url address.
+   * @param string $mediaId Media ID, returned from API while uploading resource.
+   * @return string
+   */
+  public function resourceUrl($mediaId) {
+    if (!$this->refreshAccessToken()) {
+      throw new Exception();
+    }
+
+    $url = "http://file.api.weixin.qq.com/cgi-bin/media/get?";
+    return "$url.access_token=".$this->accessToken."&media_id=$mediaId";
   }
 
   /**
@@ -252,7 +368,7 @@ class WxSdk {
     $this->accessToken = $rt['access_token'];
     $this->accessTokenExpires = time() + $rt['expires_in'];
 
-    file_put_contents("log.txt", $this->accessToken.PHP_EOL);
+    // file_put_contents("log.txt", $this->accessToken.PHP_EOL);
     return true;
   }
 
@@ -265,7 +381,7 @@ class WxSdk {
     if (empty($data) || empty($data['errcode'])) 
       return;
 
-    $this->errorCode = $data['errorCode'];
+    $this->errorCode = $data['errcode'];
     $this->errorMsg = $data['errmsg'];
   }
 
@@ -279,16 +395,16 @@ class WxSdk {
    * contains POST parameters, the response will not be cached.
    * @return array 
    */
-  public function request($url, $queryString, $post = false, $postString = '') {
+  public function request($url, $queryString, $post = false, $postString = '', $relativeUrl = true) {
     $start_time = ($this->isLog ? microtime(true) : 0);
     if ($this->method == 'curl') {
       if (is_callable('curl_init'))
-        $rt = $this->requestByCurl($url, $queryString, $post, $postString);
+        $rt = $this->requestByCurl($url, $queryString, $post, $postString, $relativeUrl);
       else
-        $rt = $this->requestBySocket($url, $queryString, $post, $postString);
+        $rt = $this->requestBySocket($url, $queryString, $post, $postString, $relativeUrl);
     }
     else
-      $rt = $this->requestBySocket($url, $queryString, $post, $postString);
+      $rt = $this->requestBySocket($url, $queryString, $post, $postString, $relativeUrl);
     $end_time = ($this->isLog ? microtime(true): 0);
     $period = $end_time - $start_time;
     $this->lastRequestDuration = $period;
@@ -298,18 +414,20 @@ class WxSdk {
   /**
    * Request by cUrl component.
    * @access private
-   * @param string $url API url address
-   * @param string $queryString Query string by GET method.
+   * @param string $url API URL address
+   * @param string $query API URL address
    * @param boolean $post Tf set to TRUE, the request contains POST parameters.
    * @param string $postString Post querystring.
    * @return array 
    */
-  private function requestByCurl($url, $queryString, $post = false, $postString = '') {
-    $c = curl_init($this->protocol."://".$this->host."$url?$queryString");
+  private function requestByCurl($url, $queryString, $post = false, $postString = '', $relativeUrl = true) {
+    $uri = ($relativeUrl? $this->protocol."://".$this->host."$url": $url);
+    $uri .= "?$queryString";
+    $c = curl_init($uri);
     curl_setopt($c, CURLOPT_RETURNTRANSFER, 1);
     if ($post) {
       curl_setopt($c, CURLOPT_POST, 1);
-      curl_setopt($c, CURLOPT_POSTFIELDS, "$postString");
+      curl_setopt($c, CURLOPT_POSTFIELDS, $postString);
     }
     $page = curl_exec($c);
     $rt = json_decode($page, true);
@@ -325,12 +443,14 @@ class WxSdk {
    * @param string $postString Post querystring.
    * @return array 
    */
-  private function requestBySocket($url, $queryString, $post = false, $postString = '') {
+  private function requestBySocket($url, $queryString, $post = false, $postString = '', $relativeUrl = true) {
+    $uri = ($relativeUrl? $this->protocol."://".$this->host."$url": $url);
+    $uri .= "?$queryString";
     if ($post) {
       return $this->postBySocket($url, $queryString, $postString);
     }
     else
-      return $this->getBySocket($url, $queryString);
+      return $this->getBySocket($uri);
   }
 
   /**
@@ -340,8 +460,7 @@ class WxSdk {
    * @param string $queryString Query string by GET method.
    * @return array
    */
-  private function getBySocket($url, $queryString) {
-    $uri = $this->protocol."://".$this->host."$url?$queryString";
+  private function getBySocket($uri) {
     $page = '';
     $fh = fopen($uri, 'r');
     if (empty($fh))
@@ -424,15 +543,20 @@ $contentString";
     $handler = null;
     switch ($wxPushData->event) {
       case "CLICK":
-        $handler = new EventClickHandler($wxPushData, $this);
+        $handler = $this->handlers['click'];
         break;
       case "subscribe":
       case "unsubscribe":
-        $handler = new EventSubscribeHandler($wxPushData, $this);
+        $handler = $this->handlers['subscribe'];
+        break;
+      case "scan":
+        $handler = $this->handlers['scan'];
         break;
     }
-    if (!empty($handler))
+    if (!empty($handler)) {
+      $handler->setPushData($wxPushData);
       $handler->response();
+    }
   }
 
   private function responseMsg($wxPushData) {
