@@ -1,10 +1,10 @@
 <?php
-require_once "config.php";
-require_once "lib/wxapi.php";
-require_once "lib/wx_push_data.php";
+require_once "../config.php";
+require_once ROOT."/lib/wxsdk.php";
+require_once ROOT."/lib/wx_push_data.php";
 
-$wxapi = new WxApi(APPID, APPSECRET);
+$wxsdk = new WxSdk(APPID, APPSECRET);
 $openid = "oyuqWt9uihlSsL5IFAh0YZnf6nLs";
 
-$info = $wxapi->getUserInfo($openid);
+$info = $wxsdk->getUserInfo($openid);
 print_r($info);

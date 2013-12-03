@@ -1,7 +1,7 @@
 <?php
-require_once "config.php";
-require_once "lib/wxsdk.php";
-require_once "lib/wx_push_data.php";
+require_once "../config.php";
+require_once ROOT."/lib/wxsdk.php";
+require_once ROOT."/lib/wx_push_data.php";
 
 $wxsdk = new WxSdk(APPID, APPSECRET);
 $openid = "oyuqWt9uihlSsL5IFAh0YZnf6nLs";
@@ -21,7 +21,7 @@ $info = $wxsdk->getUserInfo($openid);
 // $data = array('text' => "新的消息很多，<a href=\"http://teeker.com\">查看</a>");
 // $rt = $wxsdk->pushMessage($openid, 'text', $data);
 
-$mediaId = $wxsdk->uploadResource('image', 'images/0.jpg');
+$mediaId = $wxsdk->uploadResource('image', '../images/0.jpg');
 if ($mediaId !== FALSE) {
   $wxsdk->pushMessage($openid, 'image', array('image_media_id' => $mediaId));
   $rt = true;

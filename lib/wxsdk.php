@@ -1,8 +1,12 @@
 <?php
 
+if (!defined('ROOT'))
+  define('ROOT', dirname(__FILE__)."/..");
+
 require_once ROOT."/lib/event_click_handler.php";
 require_once ROOT."/lib/event_subscribe_handler.php";
 require_once ROOT."/lib/event_scan_handler.php";
+require_once ROOT."/lib/event_location_handler.php";
 require_once ROOT."/lib/msg_handler.php";
 require_once ROOT."/lib/wx_sdk_error.php";
 
@@ -90,6 +94,7 @@ class WxSdk {
     $this->handlers['subscribe'] = new EventSubscribeHandler(null, $this);
     $this->handlers['click'] = new EventClickHandler(null, $this);
     $this->handlers['scan'] = new EventScanHandler(null, $this);
+    $this->handlers['location'] = new EventLocationHandler(null, $this);
   }
 
   /**
@@ -366,9 +371,8 @@ class WxSdk {
     }
 
     $this->accessToken = $rt['access_token'];
-    $this->accessTokenExpires = time() + $rt['expires_in'];
+    $this->accessTokenExpires = time() + $rt['expires_in'] - 10;
 
-    // file_put_contents("log.txt", $this->accessToken.PHP_EOL);
     return true;
   }
 
@@ -541,8 +545,8 @@ $contentString";
 
   private function responseEvent($wxPushData) {
     $handler = null;
-    switch ($wxPushData->event) {
-      case "CLICK":
+    switch (strtolower($wxPushData->event)) {
+      case "click":
         $handler = $this->handlers['click'];
         break;
       case "subscribe":
@@ -551,6 +555,9 @@ $contentString";
         break;
       case "scan":
         $handler = $this->handlers['scan'];
+        break;
+      case "location":
+        $handler = $this->handlers['location'];
         break;
     }
     if (!empty($handler)) {
