@@ -28,21 +28,23 @@ class MyClickhandler extends EventClickHandler {
 
     $picurl = $profile['headimgurl'];
     $url = "http://wxapi.teeker.com/web/show_contacts.php?openid=".$this->wxPushData->fromUserName;
-    echo "<xml>".PHP_EOL;
-    echo "  <ToUserName><![CDATA[".$this->wxPushData->fromUserName."]]></ToUserName>".PHP_EOL;
-    echo "  <FromUserName><![CDATA[".$this->wxPushData->toUserName."]]></FromUserName>".PHP_EOL;
-    echo "  <CreateTime>".time()."</CreateTime>".PHP_EOL;
-    echo "  <MsgType><![CDATA[news]]></MsgType>".PHP_EOL;
-    echo "  <ArticleCount>1</ArticleCount>".PHP_EOL;
-    echo "  <Articles>".PHP_EOL;
-    echo "    <item>".PHP_EOL;
-    echo "      <Title><![CDATA[".$profile['nickname']."]]></Title>".PHP_EOL;
-    echo "      <Description><![CDATA[描述]]></Description>".PHP_EOL;
-    echo "      <PicUrl><![CDATA[$picurl]]></PicUrl>".PHP_EOL;
-    echo "      <Url><![CDATA[$url]]></Url>".PHP_EOL;
-    echo "    </item>".PHP_EOL;
-    echo "  </Articles>".PHP_EOL;
-    echo "</xml>".PHP_EOL;
+    $this->wxSdk->returnPushArticles($this->wxPushData->toUserName, 
+      $this->wxPushData->fromUserName,
+      array(
+        array(
+          'title' => $profile['nickname'],
+          'description' => '描述',
+          'picurl' => $picurl,
+          'url' => $url
+        ),
+        array(
+          'title' => '2'.$profile['nickname'],
+          'description' => '描述',
+          'picurl' => $picurl,
+          'url' => $url
+        )
+      )
+    );
   }
 }
 ?>

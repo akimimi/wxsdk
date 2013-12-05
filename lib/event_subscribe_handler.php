@@ -1,6 +1,6 @@
 <?php
 
-require_once "wx_push_handler.php";
+require_once ROOT."/lib/wx_push_handler.php";
 
 class EventSubscribeHandler extends WxPushHandler {
   public function __construct($data, &$api) {

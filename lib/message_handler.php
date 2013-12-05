@@ -2,7 +2,7 @@
 
 require_once ROOT."/lib/wx_push_handler.php";
 
-class EventClickHandler extends WxPushHandler {
+class MessageHandler extends WxPushHandler {
   public function __construct($data, &$sdk) {
     parent::__construct($data, $sdk);
   }
@@ -11,3 +11,4 @@ class EventClickHandler extends WxPushHandler {
     return;
   }
 };
+

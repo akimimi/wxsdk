@@ -7,7 +7,7 @@ require_once ROOT."/lib/event_click_handler.php";
 require_once ROOT."/lib/event_subscribe_handler.php";
 require_once ROOT."/lib/event_scan_handler.php";
 require_once ROOT."/lib/event_location_handler.php";
-require_once ROOT."/lib/msg_handler.php";
+require_once ROOT."/lib/message_handler.php";
 require_once ROOT."/lib/wx_sdk_error.php";
 
 class WxSdk {
@@ -95,6 +95,7 @@ class WxSdk {
     $this->handlers['click'] = new EventClickHandler(null, $this);
     $this->handlers['scan'] = new EventScanHandler(null, $this);
     $this->handlers['location'] = new EventLocationHandler(null, $this);
+    $this->handlers['message'] = new MessageHandler(null, $this);
   }
 
   /**
@@ -303,6 +304,97 @@ class WxSdk {
     }
   }
 
+  public function returnPushText($from, $to, $text) {
+    if (empty($text))
+      return;
+
+    echo "<xml>".PHP_EOL;
+    echo "  <ToUserName><![CDATA[".$to."]]></ToUserName>".PHP_EOL;
+    echo "  <FromUserName><![CDATA[".$from."]]></FromUserName>".PHP_EOL;
+    echo "  <CreateTime>".time()."</CreateTime>".PHP_EOL;
+    echo "  <MsgType><![CDATA[text]]></MsgType>".PHP_EOL;
+    echo "  <Content><![CDATA[$text]]></Content>".PHP_EOL;
+    echo "</xml>".PHP_EOL;
+  }
+
+  public function returnPushImage($from, $to, $mediaId) {
+    if (empty($mediaId))
+      return;
+
+    echo "<xml>".PHP_EOL;
+    echo "  <ToUserName><![CDATA[".$to."]]></ToUserName>".PHP_EOL;
+    echo "  <FromUserName><![CDATA[".$from."]]></FromUserName>".PHP_EOL;
+    echo "  <CreateTime>".time()."</CreateTime>".PHP_EOL;
+    echo "  <MsgType><![CDATA[image]]></MsgType>".PHP_EOL;
+    echo "  <Image>".PHP_EOL;
+    echo "    <MediaId><![CDATA[$mediaId]]></MediaId>".PHP_EOL;
+    echo "  </Image>".PHP_EOL;
+    echo "</xml>".PHP_EOL;
+  }
+
+  public function returnPushVoice($from, $to, $mediaId) {
+    if (empty($mediaId))
+      return;
+
+    echo "<xml>".PHP_EOL;
+    echo "  <ToUserName><![CDATA[".$to."]]></ToUserName>".PHP_EOL;
+    echo "  <FromUserName><![CDATA[".$from."]]></FromUserName>".PHP_EOL;
+    echo "  <CreateTime>".time()."</CreateTime>".PHP_EOL;
+    echo "  <MsgType><![CDATA[image]]></MsgType>".PHP_EOL;
+    echo "  <Voice>".PHP_EOL;
+    echo "    <MediaId><![CDATA[$mediaId]]></MediaId>".PHP_EOL;
+    echo "  </Voice>".PHP_EOL;
+    echo "</xml>".PHP_EOL;
+  }
+
+  public function returnPushVideo($from, $to, $mediaId) {
+    if (empty($mediaId))
+      return;
+
+    echo "<xml>".PHP_EOL;
+    echo "  <ToUserName><![CDATA[".$to."]]></ToUserName>".PHP_EOL;
+    echo "  <FromUserName><![CDATA[".$from."]]></FromUserName>".PHP_EOL;
+    echo "  <CreateTime>".time()."</CreateTime>".PHP_EOL;
+    echo "  <MsgType><![CDATA[image]]></MsgType>".PHP_EOL;
+    echo "  <Video>".PHP_EOL;
+    echo "    <MediaId><![CDATA[$mediaId]]></MediaId>".PHP_EOL;
+    echo "  </Video>".PHP_EOL;
+    echo "</xml>".PHP_EOL;
+  }
+
+
+  public function returnPushArticles($from, $to, $articles) {
+    if (empty($articles)) {
+      return;
+    }
+
+    $itemStr = "";
+    foreach ($articles as $article) {
+      if (empty($article['title']) 
+          || empty($article['picurl'])
+          || empty($article['url'])) {
+        continue;
+      }
+
+      $desc = empty($article['description'])? "": $article['description'];
+      $itemStr .= "    <item>".PHP_EOL;
+      $itemStr .= "      <Title><![CDATA[".$article['title']."]]></Title>".PHP_EOL;
+      $itemStr .= "      <Description><![CDATA[".$desc."]]></Description>".PHP_EOL;
+      $itemStr .= "      <PicUrl><![CDATA[".$article['picurl']."]]></PicUrl>".PHP_EOL;
+      $itemStr .= "      <Url><![CDATA[".$article['url']."]]></Url>".PHP_EOL;
+      $itemStr .= "    </item>".PHP_EOL;
+    }
+    echo "<xml>".PHP_EOL;
+    echo "  <ToUserName><![CDATA[".$to."]]></ToUserName>".PHP_EOL;
+    echo "  <FromUserName><![CDATA[".$from."]]></FromUserName>".PHP_EOL;
+    echo "  <CreateTime>".time()."</CreateTime>".PHP_EOL;
+    echo "  <MsgType><![CDATA[news]]></MsgType>".PHP_EOL;
+    echo "  <ArticleCount>".count($articles)."</ArticleCount>".PHP_EOL;
+    echo "  <Articles>".PHP_EOL;
+    echo $itemStr;
+    echo "  </Articles>".PHP_EOL;
+    echo "</xml>".PHP_EOL;
+  }
   /**
    * Upload resource file, with supported types of image, voice, video and thumb.
    * @param string $mediaType Media type string.
@@ -567,9 +659,11 @@ $contentString";
   }
 
   private function responseMsg($wxPushData) {
-    $handler = new MsgHandler($wxPushData, $this);
-    if (!empty($handler))
+    $handler = $this->handlers['message'];
+    if (!empty($handler)) {
+      $handler->setPushData($wxPushData);
       $handler->response();
+    }
   }
 };
 
