@@ -24,12 +24,9 @@ class MyScanHandler extends EventScanHandler {
 
   public function showContacts() {
     $profile = $this->wxSdk->getUserInfo($this->wxPushData->fromUserName);
-    echo "<xml>".PHP_EOL;
-    echo "  <ToUserName><![CDATA[".$this->wxPushData->fromUserName."]]></ToUserName>".PHP_EOL;
-    echo "  <FromUserName><![CDATA[".$this->wxPushData->toUserName."]]></FromUserName>".PHP_EOL;
-    echo "  <CreateTime>".time()."</CreateTime>".PHP_EOL;
-    echo "  <MsgType><![CDATA[text]]></MsgType>".PHP_EOL;
-    echo "  <Content><![CDATA[".$profile['nickname']."点击了".$this->wxPushData->eventKey."]]></Content>".PHP_EOL;
-    echo "</xml>".PHP_EOL;
+    $content = $profile['nickname']."点击了".$this->wxPushData->eventKey;
+    $this->wxSdk->returnPushText($this->wxPushData->toUserName, 
+      $this->wxPushData->fromUserName, 
+      $content);
   }
 }
